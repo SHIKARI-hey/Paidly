@@ -41,6 +41,9 @@ export async function handleCreateLinkToken(data?: { mfaToken?: string; userId?:
         products: ["transactions"],
         country_codes: ["US"],
         language: "en",
+        ...(process.env.PLAID_REDIRECT_URI
+          ? { redirect_uri: process.env.PLAID_REDIRECT_URI }
+          : {}),
       }),
     });
 

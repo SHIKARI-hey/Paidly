@@ -132,13 +132,22 @@ function WelcomeIntroModal({ onContinue }: { onContinue: () => void }) {
 }
 export function CardIntro() {
   const navigate = useNavigate()
-  const [showIntro, setShowIntro] = useState(() => {
-    if (typeof window === 'undefined') return false
-    return !localStorage.getItem('paidly_welcomed')
-  })
+  const [showIntro, setShowIntro] = useState(false)
+  // Hydration-safe: the server render and the first client render must match,
+  // so the localStorage read happens after mount instead of in the initializer.
+  const [hydrated, setHydrated] = useState(false)
 
   useEffect(() => {
-    if (showIntro) return // wait for user to tap Continue
+    try {
+      setShowIntro(!localStorage.getItem('paidly_welcomed'))
+    } catch {
+      setShowIntro(true)
+    }
+    setHydrated(true)
+  }, [])
+
+  useEffect(() => {
+    if (!hydrated || showIntro) return // wait for hydration or Continue tap
     const loggedIn = isUserLoggedIn()
     const timer = setTimeout(() => {
       if (loggedIn) {
@@ -148,7 +157,7 @@ export function CardIntro() {
       }
     }, loggedIn ? 1400 : 2800)
     return () => clearTimeout(timer)
-  }, [navigate, showIntro])
+  }, [navigate, showIntro, hydrated])
 
   function handleIntroContinue() {
     localStorage.setItem('paidly_welcomed', '1')
