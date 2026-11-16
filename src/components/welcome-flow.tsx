@@ -138,6 +138,13 @@ export function CardIntro() {
   // so the localStorage read happens after mount instead of in the initializer.
   const [hydrated, setHydrated] = useState(false)
 
+  // Handle Google OAuth return on root origin
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.hash.includes('access_token=')) {
+      window.location.replace('/auth' + window.location.hash)
+    }
+  }, [])
+
   useEffect(() => {
     try {
       setShowIntro(!localStorage.getItem('paidly_welcomed'))
@@ -395,7 +402,8 @@ export function AuthScreen() {
       (import.meta as any).env?.GOOGLE_CLIENT_ID
 
     if (effectiveClientId) {
-      const redirectUri = window.location.origin + '/auth'
+      // Use registered origin as redirect URI
+      const redirectUri = window.location.origin
       const scope = encodeURIComponent('email profile openid')
       window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${effectiveClientId}&redirect_uri=${encodeURIComponent(
         redirectUri
