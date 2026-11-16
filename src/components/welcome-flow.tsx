@@ -399,15 +399,16 @@ export function AuthScreen() {
     const effectiveClientId =
       googleClientId ||
       (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID ||
-      (import.meta as any).env?.GOOGLE_CLIENT_ID
+      (import.meta as any).env?.GOOGLE_CLIENT_ID ||
+      '1066342332758-epi929qlrj0pnbbrn7mau59a73v6089sv.apps.googleusercontent.com'
 
     if (effectiveClientId) {
-      // Use registered origin as redirect URI
+      // Use registered origin as redirect URI and force account chooser
       const redirectUri = window.location.origin
       const scope = encodeURIComponent('email profile openid')
       window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${effectiveClientId}&redirect_uri=${encodeURIComponent(
         redirectUri
-      )}&response_type=token&scope=${scope}`
+      )}&response_type=token&scope=${scope}&prompt=select_account`
       return
     }
 
@@ -503,17 +504,6 @@ export function AuthScreen() {
           <GoogleIcon className="w-5 h-5 shrink-0" />
           <span>Continue with Google</span>
         </button>
-
-        {/* Security Assurance */}
-        <div className="mt-8 flex flex-col items-center gap-2 text-center text-xs text-muted-foreground">
-          <div className="flex items-center gap-1.5 text-muted-foreground/80">
-            <ShieldCheck className="w-4 h-4 text-emerald-500" />
-            <span className="font-medium">Bank-grade 256-bit encryption</span>
-          </div>
-          <p className="text-[11px] text-muted-foreground/60 max-w-[280px]">
-            Multi-Factor Authentication is enforced before bank or card access. We never store banking credentials.
-          </p>
-        </div>
       </div>
 
       {/* Google Account Modal */}
