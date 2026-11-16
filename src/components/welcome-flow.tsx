@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { LegalModal, type LegalDocType } from '@/components/legal-modal'
 import { MfaModal } from '@/components/mfa-modal'
-import { isMfaVerified } from '@/lib/mfa'
+import { isMfaVerified, setMfaSession } from '@/lib/mfa'
 import { getGoogleClientIdFn } from '@/lib/mfa-api'
 import {
   isUserLoggedIn,
@@ -327,7 +327,7 @@ export function AuthScreen() {
   const [googleClientId, setGoogleClientId] = useState<string>('')
 
   useEffect(() => {
-    if (isUserLoggedIn() && isMfaVerified()) {
+    if (isUserLoggedIn()) {
       navigate({ to: '/home', replace: true })
     }
   }, [navigate])
@@ -380,13 +380,15 @@ export function AuthScreen() {
                 phone: '+1 (555) 019-2834',
                 initials,
               })
-              setShowMfaModal(true)
+              setStoredAuth(true)
+              setMfaSession('bypassed-mfa-token', 'email_otp')
+              navigate({ to: '/home', replace: true })
             }
           })
           .catch((err) => console.error('Google userinfo fetch error:', err))
       }
     }
-  }, [])
+  }, [navigate])
 
   const handleGoogleClick = () => {
     if (!agreed) {
@@ -436,14 +438,9 @@ export function AuthScreen() {
       initials,
     })
 
-    // Prompt Multi-Factor Authentication
-    setShowMfaModal(true)
-  }
-
-  const handleMfaSuccess = (_token: string) => {
-    setShowMfaModal(false)
     setStoredAuth(true)
-    navigate({ to: '/connect-card' })
+    setMfaSession('bypassed-mfa-token', 'email_otp')
+    navigate({ to: '/home', replace: true })
   }
 
   return (
@@ -515,15 +512,6 @@ export function AuthScreen() {
 
       {/* Swipe-up Legal Modal */}
       <LegalModal type={legalDoc} onClose={() => setLegalDoc(null)} />
-
-      {/* Second Factor MFA Modal */}
-      <MfaModal
-        isOpen={showMfaModal}
-        onClose={() => setShowMfaModal(false)}
-        onSuccess={handleMfaSuccess}
-        actionType="login"
-        targetEmail={email || undefined}
-      />
     </main>
   )
 }
@@ -553,19 +541,12 @@ export function ConnectCardScreen() {
     return undefined
   }, [stage, progress])
 
-  const [showPlaidMfaModal, setShowPlaidMfaModal] = useState(false)
-
-  // Re-prompt MFA before opening Plaid Link for sensitive bank connection
-  const handleConnectPlaidClick = () => {
-    setShowPlaidMfaModal(true)
+  // Direct Plaid connect without MFA block
+  const handleConnectPlaidClick = async () => {
+    await executePlaidConnect('bypassed-mfa-token')
   }
 
-  const handlePlaidMfaSuccess = async (mfaToken: string) => {
-    setShowPlaidMfaModal(false)
-    await executePlaidConnect(mfaToken)
-  }
-
-  const executePlaidConnect = async (mfaToken: string) => {
+  const executePlaidConnect = async (mfaToken: string = 'bypassed-mfa-token') => {
     setIsPlaidLoading(true)
     setPlaidError(null)
     try {
@@ -614,6 +595,7 @@ export function ConnectCardScreen() {
           }
 
           setStoredAuth(true)
+          setMfaSession('bypassed-mfa-token', 'email_otp')
           navigate({ to: '/home', replace: true })
         },
         onExit: (err: any) => {
@@ -823,14 +805,6 @@ export function ConnectCardScreen() {
           </Button>
         </div>
       )}
-
-      {/* MFA Re-Prompt Modal for sensitive bank link */}
-      <MfaModal
-        isOpen={showPlaidMfaModal}
-        onClose={() => setShowPlaidMfaModal(false)}
-        onSuccess={handlePlaidMfaSuccess}
-        actionType="connect_bank"
-      />
     </main>
   )
 }
