@@ -50,29 +50,14 @@ export async function handleCreateLinkToken(data?: { mfaToken?: string; userId?:
       language: "en",
     };
 
-    if (process.env.PLAID_REDIRECT_URI) {
-      payload.redirect_uri = process.env.PLAID_REDIRECT_URI;
-    }
-
-    let response = await fetch(`${PLAID_BASE_URL}/link/token/create`, {
+    // Do not send redirect_uri — using Plaid Link in-browser (not OAuth redirect flow)
+    const response = await fetch(`${PLAID_BASE_URL}/link/token/create`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
 
-    let resData = await response.json();
-
-    // If Plaid rejected due to redirect_uri mismatch, automatically retry without redirect_uri
-    if (!response.ok && payload.redirect_uri && resData.error_message?.includes("redirect_uri")) {
-      console.warn("Plaid redirect_uri mismatch, retrying without redirect_uri:", resData.error_message);
-      delete payload.redirect_uri;
-      response = await fetch(`${PLAID_BASE_URL}/link/token/create`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      resData = await response.json();
-    }
+    const resData = await response.json();
 
     if (!response.ok) {
       console.error("Plaid link token error:", resData);
