@@ -188,19 +188,134 @@ export function CardIntro() {
   )
 }
 
+function GoogleIcon({ className = 'w-5 h-5' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        fill="#4285F4"
+        d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.65v3.03h3.88c2.27-2.09 3.66-5.17 3.66-9.12z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.03c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.13C3.27 21.43 7.33 24 12 24z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M5.28 14.29c-.25-.72-.38-1.49-.38-2.29s.13-1.57.38-2.29V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.13z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.27 2.57 1.25 6.58l4.03 3.13c.95-2.83 3.6-4.96 6.72-4.96z"
+      />
+    </svg>
+  )
+}
+
+function GoogleAccountModal({
+  isOpen,
+  onClose,
+  onSelectAccount,
+}: {
+  isOpen: boolean
+  onClose: () => void
+  onSelectAccount: (account: { name: string; email: string }) => void
+}) {
+  const [googleEmail, setGoogleEmail] = useState('')
+  const [googleName, setGoogleName] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  if (!isOpen) return null
+
+  const handleProceed = (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    if (!googleEmail.trim()) return
+    const cleanEmail = googleEmail.trim()
+    const cleanName = googleName.trim() || cleanEmail.split('@')[0] || 'Google User'
+    setIsSubmitting(true)
+    setTimeout(() => {
+      setIsSubmitting(false)
+      onSelectAccount({ name: cleanName, email: cleanEmail })
+    }, 300)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="w-full max-w-[370px] bg-card border border-border rounded-2xl p-6 shadow-2xl flex flex-col">
+        {/* Google Header */}
+        <div className="flex items-center gap-3 mb-3">
+          <GoogleIcon className="w-6 h-6 shrink-0" />
+          <div>
+            <h3 className="font-semibold text-foreground text-[0.95rem]">Sign in with Google</h3>
+            <p className="text-xs text-muted-foreground">to continue to Paidly</p>
+          </div>
+        </div>
+
+        <div className="h-px bg-border my-2" />
+
+        <form onSubmit={handleProceed} className="space-y-3.5 mt-2">
+          <div className="space-y-1 text-left">
+            <label className="text-xs font-medium text-foreground">Google Email</label>
+            <Input
+              type="email"
+              required
+              autoFocus
+              placeholder="name@gmail.com"
+              value={googleEmail}
+              onChange={(e) => setGoogleEmail(e.target.value)}
+              className="bg-muted/40 text-sm h-11"
+            />
+          </div>
+
+          <div className="space-y-1 text-left">
+            <label className="text-xs font-medium text-foreground">Your Name (Optional)</label>
+            <Input
+              type="text"
+              placeholder="e.g. Shikari"
+              value={googleName}
+              onChange={(e) => setGoogleName(e.target.value)}
+              className="bg-muted/40 text-sm h-11"
+            />
+          </div>
+
+          <p className="text-[11px] text-muted-foreground text-left leading-relaxed pt-1">
+            Paidly will securely verify your identity with Multi-Factor Authentication before bank connection.
+          </p>
+
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={isSubmitting}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={isSubmitting || !googleEmail.trim()}
+              className="bg-primary text-primary-foreground font-semibold px-4"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                  Connecting...
+                </>
+              ) : (
+                'Continue'
+              )}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 export function AuthScreen() {
   const navigate = useNavigate()
-  const [login, setLogin] = useState(false)
-  const [visible, setVisible] = useState(false)
-  const [forgot, setForgot] = useState(false)
-  const [sent, setSent] = useState(false)
   const [agreed, setAgreed] = useState(false)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [legalDoc, setLegalDoc] = useState<LegalDocType>(null)
   const [showMfaModal, setShowMfaModal] = useState(false)
+  const [showGoogleModal, setShowGoogleModal] = useState(false)
 
   useEffect(() => {
     if (isUserLoggedIn() && isMfaVerified()) {
@@ -208,52 +323,96 @@ export function AuthScreen() {
     }
   }, [navigate])
 
-  const handleMfaSuccess = (_token: string) => {
-    setShowMfaModal(false)
-    setStoredAuth(true)
+  // Handle Google OAuth token redirect if returning with token
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const hash = window.location.hash
+    if (hash && hash.includes('access_token=')) {
+      const params = new URLSearchParams(hash.replace(/^#/, ''))
+      const token = params.get('access_token')
+      if (token) {
+        fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data?.email) {
+              const cleanEmail = data.email
+              const cleanName = data.name || cleanEmail.split('@')[0] || 'Google User'
+              const initials =
+                cleanName
+                  .split(' ')
+                  .map((w: string) => w[0])
+                  .slice(0, 2)
+                  .join('')
+                  .toUpperCase() || 'GU'
 
-    const cleanEmail = email.trim() || 'user@example.com'
-    const cleanName = name.trim() || 'Account Holder'
-    const initials =
-      cleanName
-        .split(' ')
-        .map((w) => w[0])
-        .slice(0, 2)
-        .join('')
-        .toUpperCase() || 'AH'
-
-    saveStoredProfile({
-      name: cleanName,
-      email: cleanEmail,
-      phone: '+1 (555) 019-2834',
-      initials,
-    })
-
-    if (login) {
-      navigate({ to: '/home', replace: true })
-    } else {
-      navigate({ to: '/connect-card' })
+              setEmail(cleanEmail)
+              setName(cleanName)
+              saveStoredProfile({
+                name: cleanName,
+                email: cleanEmail,
+                phone: '+1 (555) 019-2834',
+                initials,
+              })
+              setShowMfaModal(true)
+            }
+          })
+          .catch((err) => console.error('Google userinfo fetch error:', err))
+      }
     }
-  }
+  }, [])
 
-  const handleFormSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (forgot) {
-      setSent(true)
-      return
-    }
-    if (!email.trim()) {
-      setErrorMsg('Please enter your email address.')
-      return
-    }
-    if (!login && !agreed) {
+  const handleGoogleClick = () => {
+    if (!agreed) {
       setErrorMsg('Please confirm you are 18+ and accept the Terms to continue.')
       return
     }
     setErrorMsg(null)
 
-    // Second Factor required at login and registration
+    // Check if Google Client ID is configured in environment
+    const googleClientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID
+    if (googleClientId) {
+      const redirectUri = window.location.origin + '/auth'
+      const scope = encodeURIComponent('email profile openid')
+      window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${googleClientId}&redirect_uri=${encodeURIComponent(
+        redirectUri
+      )}&response_type=token&scope=${scope}`
+      return
+    }
+
+    // Direct Google Sign-In sheet
+    setShowGoogleModal(true)
+  }
+
+  const handleGoogleAccountSelected = (account: { name: string; email: string }) => {
+    setShowGoogleModal(false)
+    setEmail(account.email)
+    setName(account.name)
+
+    const initials =
+      account.name
+        .split(' ')
+        .map((w) => w[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase() || 'GU'
+
+    saveStoredProfile({
+      name: account.name,
+      email: account.email,
+      phone: '+1 (555) 019-2834',
+      initials,
+    })
+
+    // Prompt Multi-Factor Authentication
     setShowMfaModal(true)
+  }
+
+  const handleMfaSuccess = (_token: string) => {
+    setShowMfaModal(false)
+    setStoredAuth(true)
+    navigate({ to: '/connect-card' })
   }
 
   return (
@@ -261,164 +420,78 @@ export function AuthScreen() {
       <div className="auth-mark overflow-hidden shadow-sm">
         <img src="/logo.png" alt="Paidly Logo" className="w-full h-full object-cover rounded-[15px]" />
       </div>
+
       <div className="onboarding-heading">
-        <h1>{forgot ? 'Reset your password' : login ? 'Welcome back.' : 'A fresh start.'}</h1>
-        <p>
-          {forgot
-            ? 'Enter your email to receive recovery instructions.'
-            : login
-              ? 'Good to see you again. Multi-factor protection is active.'
-              : 'Keep everything you subscribe to, together.'}
-        </p>
+        <h1>A fresh start.</h1>
+        <p>Keep everything you subscribe to, together. Sign in with Google to get started.</p>
       </div>
 
-      {sent ? (
-        <div className="demo-message">
-          <Check />
-          <h2>Email Sent</h2>
-          <p>We sent a secure password reset link to your email address.</p>
-          <Button
-            onClick={() => {
-              setForgot(false)
-              setSent(false)
-            }}
-          >
-            Back to login
-          </Button>
-        </div>
-      ) : (
-        <form className="onboarding-form" onSubmit={handleFormSubmit}>
-          {!login && !forgot && (
-            <label className="welcome-field">
-              Full name
-              <Input
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                autoComplete="name"
-                placeholder="Your full name"
-              />
-            </label>
-          )}
-          <label className="welcome-field">
-            Email address
-            <Input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoComplete="email"
-              placeholder="name@example.com"
-            />
-          </label>
-          {!forgot && (
-            <label className="welcome-field">
-              Password
-              <div className="password-field">
-                <Input
-                  type={visible ? 'text' : 'password'}
-                  required
-                  minLength={6}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="current-password"
-                  placeholder="At least 6 characters"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label={visible ? 'Hide password' : 'Show password'}
-                  onClick={() => setVisible(!visible)}
-                >
-                  {visible ? <EyeOff /> : <Eye />}
-                </Button>
-              </div>
-            </label>
-          )}
-
-          {/* Terms of Service & Privacy Policy checkbox with 18+ confirmation */}
-          {!login && !forgot && (
-            <div className="space-y-1.5 pt-0.5">
-              <div className="flex items-start gap-2.5 text-xs text-muted-foreground leading-snug">
-                <Checkbox
-                  id="terms-agreement"
-                  checked={agreed}
-                  onCheckedChange={(val) => {
-                    setAgreed(!!val)
-                    if (val) setErrorMsg(null)
-                  }}
-                  className="mt-0.5 cursor-pointer"
-                />
-                <label htmlFor="terms-agreement" className="select-none cursor-pointer">
-                  I confirm I am{' '}
-                  <span className="font-semibold text-foreground">18 years or older</span>
-                  {', '}and I agree to Paidly's{' '}
-                  <button
-                    type="button"
-                    onClick={() => setLegalDoc('terms')}
-                    className="text-foreground font-semibold underline underline-offset-2 hover:opacity-80 transition-opacity cursor-pointer"
-                  >
-                    Terms of Service
-                  </button>{' '}
-                  and{' '}
-                  <button
-                    type="button"
-                    onClick={() => setLegalDoc('privacy')}
-                    className="text-foreground font-semibold underline underline-offset-2 hover:opacity-80 transition-opacity cursor-pointer"
-                  >
-                    Privacy Policy
-                  </button>
-                  .
-                </label>
-              </div>
-              {errorMsg && <p className="text-[11px] text-destructive font-medium pl-6">{errorMsg}</p>}
-            </div>
-          )}
-
-          {login && !forgot && (
-            <Button
-              type="button"
-              variant="link"
-              className="forgot-link"
-              onClick={() => setForgot(true)}
-            >
-              Forgot password?
-            </Button>
-          )}
-          <Button type="submit" className="welcome-primary">
-            {forgot ? 'Send reset link' : login ? 'Continue with MFA' : 'Create account'}
-            <ArrowRight />
-          </Button>
-        </form>
-      )}
-
-      <div className="auth-switch">
-        {forgot ? (
-          <Button
-            variant="link"
-            onClick={() => {
-              setForgot(false)
-              setSent(false)
-            }}
-          >
-            Back to login
-          </Button>
-        ) : (
-          <>
-            <span>{login ? 'New here?' : 'Already have an account?'}</span>
-            <Button
-              variant="link"
-              onClick={() => {
-                setLogin(!login)
-                setErrorMsg(null)
+      <div className="flex flex-col gap-4">
+        {/* Terms of Service & Privacy Policy checkbox with 18+ confirmation */}
+        <div className="space-y-1.5 pt-0.5 text-left">
+          <div className="flex items-start gap-2.5 text-xs text-muted-foreground leading-snug">
+            <Checkbox
+              id="terms-agreement"
+              checked={agreed}
+              onCheckedChange={(val) => {
+                setAgreed(!!val)
+                if (val) setErrorMsg(null)
               }}
-            >
-              {login ? 'Sign up' : 'Log in'}
-            </Button>
-          </>
-        )}
+              className="mt-0.5 cursor-pointer"
+            />
+            <label htmlFor="terms-agreement" className="select-none cursor-pointer">
+              I confirm I am{' '}
+              <span className="font-semibold text-foreground">18 years or older</span>
+              {', '}and I agree to Paidly's{' '}
+              <button
+                type="button"
+                onClick={() => setLegalDoc('terms')}
+                className="text-foreground font-semibold underline underline-offset-2 hover:opacity-80 transition-opacity cursor-pointer"
+              >
+                Terms of Service
+              </button>{' '}
+              and{' '}
+              <button
+                type="button"
+                onClick={() => setLegalDoc('privacy')}
+                className="text-foreground font-semibold underline underline-offset-2 hover:opacity-80 transition-opacity cursor-pointer"
+              >
+                Privacy Policy
+              </button>
+              .
+            </label>
+          </div>
+          {errorMsg && <p className="text-[11px] text-destructive font-medium pl-6">{errorMsg}</p>}
+        </div>
+
+        {/* Continue with Google button */}
+        <button
+          type="button"
+          onClick={handleGoogleClick}
+          className="w-full h-12 rounded-xl border border-border bg-card hover:bg-muted/40 active:scale-[0.99] text-foreground font-semibold text-[0.95rem] flex items-center justify-center gap-3 shadow-sm transition-all cursor-pointer mt-1"
+        >
+          <GoogleIcon className="w-5 h-5 shrink-0" />
+          <span>Continue with Google</span>
+        </button>
+
+        {/* Security Assurance */}
+        <div className="mt-8 flex flex-col items-center gap-2 text-center text-xs text-muted-foreground">
+          <div className="flex items-center gap-1.5 text-muted-foreground/80">
+            <ShieldCheck className="w-4 h-4 text-emerald-500" />
+            <span className="font-medium">Bank-grade 256-bit encryption</span>
+          </div>
+          <p className="text-[11px] text-muted-foreground/60 max-w-[280px]">
+            Multi-Factor Authentication is enforced before bank or card access. We never store banking credentials.
+          </p>
+        </div>
       </div>
+
+      {/* Google Account Modal */}
+      <GoogleAccountModal
+        isOpen={showGoogleModal}
+        onClose={() => setShowGoogleModal(false)}
+        onSelectAccount={handleGoogleAccountSelected}
+      />
 
       {/* Swipe-up Legal Modal */}
       <LegalModal type={legalDoc} onClose={() => setLegalDoc(null)} />
