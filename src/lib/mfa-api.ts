@@ -51,3 +51,15 @@ export const removeBankCardFn = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     return await handleRemoveBankCard(data);
   });
+
+/**
+ * 6. Retrieve Configured Google OAuth Client ID
+ */
+export const getGoogleClientIdFn = createServerFn({ method: "GET" }).handler(async () => {
+  return {
+    clientId:
+      process.env.VITE_GOOGLE_CLIENT_ID ||
+      process.env.GOOGLE_CLIENT_ID ||
+      "",
+  };
+});

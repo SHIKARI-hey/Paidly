@@ -7,6 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { LegalModal, type LegalDocType } from '@/components/legal-modal'
 import { MfaModal } from '@/components/mfa-modal'
 import { isMfaVerified } from '@/lib/mfa'
+import { getGoogleClientIdFn } from '@/lib/mfa-api'
 import {
   isUserLoggedIn,
   setStoredAuth,
@@ -316,12 +317,29 @@ export function AuthScreen() {
   const [legalDoc, setLegalDoc] = useState<LegalDocType>(null)
   const [showMfaModal, setShowMfaModal] = useState(false)
   const [showGoogleModal, setShowGoogleModal] = useState(false)
+  const [googleClientId, setGoogleClientId] = useState<string>('')
 
   useEffect(() => {
     if (isUserLoggedIn() && isMfaVerified()) {
       navigate({ to: '/home', replace: true })
     }
   }, [navigate])
+
+  // Retrieve Google Client ID from server or env
+  useEffect(() => {
+    const envId =
+      (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID ||
+      (import.meta as any).env?.GOOGLE_CLIENT_ID
+    if (envId) {
+      setGoogleClientId(envId)
+    } else {
+      getGoogleClientIdFn()
+        .then((res) => {
+          if (res?.clientId) setGoogleClientId(res.clientId)
+        })
+        .catch(() => {})
+    }
+  }, [])
 
   // Handle Google OAuth token redirect if returning with token
   useEffect(() => {
@@ -370,12 +388,16 @@ export function AuthScreen() {
     }
     setErrorMsg(null)
 
-    // Check if Google Client ID is configured in environment
-    const googleClientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID
-    if (googleClientId) {
+    // Check if Google Client ID is configured
+    const effectiveClientId =
+      googleClientId ||
+      (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID ||
+      (import.meta as any).env?.GOOGLE_CLIENT_ID
+
+    if (effectiveClientId) {
       const redirectUri = window.location.origin + '/auth'
       const scope = encodeURIComponent('email profile openid')
-      window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${googleClientId}&redirect_uri=${encodeURIComponent(
+      window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${effectiveClientId}&redirect_uri=${encodeURIComponent(
         redirectUri
       )}&response_type=token&scope=${scope}`
       return
