@@ -797,6 +797,7 @@ export function ConnectCardScreen() {
             className="welcome-primary"
             onClick={() => {
               setStoredAuth(true)
+              setMfaSession('bypassed-mfa-token', 'email_otp')
               navigate({ to: '/home', replace: true })
             }}
           >
